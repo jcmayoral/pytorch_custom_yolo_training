@@ -55,8 +55,8 @@ burn_in = int(hyperparams["burn_in"])
 
 # Initiate model
 model = Darknet(opt.model_config_path)
-model.load_weights(opt.weights_path)
-#model.apply(weights_init_normal)
+#model.load_weights(opt.weights_path)
+model.apply(weights_init_normal)
 
 if cuda:
     model = model.cuda()
@@ -80,7 +80,6 @@ for epoch in range(opt.epochs):
         optimizer.zero_grad()
 
         loss = model(imgs, targets)
-
         loss.backward()
         optimizer.step()
 
