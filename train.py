@@ -45,6 +45,7 @@ classes = load_classes(opt.class_path)
 # Get data configuration
 data_config = parse_data_config(opt.data_config_path)
 train_path = data_config["train"]
+valid_path = data_config["valid"]
 
 # Get hyper parameters
 hyperparams = parse_model_config(opt.model_config_path)[0]
@@ -65,16 +66,27 @@ model.train()
 
 # Get dataloader
 dataloader = torch.utils.data.DataLoader(
-    ListDataset(train_path), batch_size=opt.batch_size, shuffle=False, num_workers=opt.n_cpu
+    ListDataset(train_path), batch_size=opt.batch_size, shuffle=True, num_workers=opt.n_cpu
+)
+
+vdataloader = torch.utils.data.DataLoader(
+    ListDataset(valid_path), batch_size=opt.batch_size, shuffle=True, num_workers=opt.n_cpu
 )
 
 Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
 
 optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()))
 
+
 for epoch in range(opt.epochs):
+    #train
+    epoch_loss = 0
+    totalimgs = 0
+
     for batch_i, (_, imgs, targets) in enumerate(dataloader):
         imgs = Variable(imgs.type(Tensor))
+        totalimgs += imgs.size(0)
+
         targets = Variable(targets.type(Tensor), requires_grad=False)
 
         optimizer.zero_grad()
@@ -84,7 +96,7 @@ for epoch in range(opt.epochs):
         optimizer.step()
 
         print(
-            "[Epoch %d/%d, Batch %d/%d] [Losses: x %f, y %f, w %f, h %f, conf %f, cls %f, total %f, recall: %.5f, precision: %.5f]"
+            "[Epoch %d/%d, Batch %d/%d] [Losses: x %f, y %f, w %f, h %f, conf %f, cls %f, total %f, epoch loss %f, recall: %.5f, precision: %.5f]"
             % (
                 epoch,
                 opt.epochs,
@@ -97,12 +109,41 @@ for epoch in range(opt.epochs):
                 model.losses["conf"],
                 model.losses["cls"],
                 loss.item(),
+                epoch_loss/totalimgs,
                 model.losses["recall"],
                 model.losses["precision"],
-            )
+            ),
+            end='\r'
         )
 
+        epoch_loss+=loss.item()
+
         model.seen += imgs.size(0)
+
+    print("\n")
+    #validation
+    test_loss = 0
+    test_imgs = 0
+    with torch.no_grad():
+        for batch_idx, (sample) in enumerate(vdataloader):
+            imgs = Variable(imgs.type(Tensor))
+            targets = Variable(targets.type(Tensor), requires_grad=False)
+            targets.require_grad = False
+            vloss = model(imgs, targets)
+            test_loss += vloss.item()
+            test_imgs+= imgs.size(0)
+
+    print(
+        "[Validation Epoch %d/%d] [Losses: total %f]"
+        % (
+            epoch,
+            opt.epochs,
+            epoch_loss/test_imgs,
+        ),
+        end='\n'
+    )
+
+
 
     if epoch % opt.checkpoint_interval == 0:
         model.save_weights("%s/%d.weights" % (opt.checkpoint_dir, epoch))
