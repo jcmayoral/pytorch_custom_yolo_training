@@ -1,0 +1,5 @@
+# train and val datasets (image directory or *.txt file with image paths)
+train=/home/jose/workspace/PyTorch_YOLOv4/4kitti-mx/pedestrian_train.txt.filter
+valid=/home/jose/workspace/PyTorch_YOLOv4/4kitti-mx/pedestrian_valid.txt.filter
+backup=/home/jose/phd-mx/yolov5/kitti-512
+names=data/grass.names
